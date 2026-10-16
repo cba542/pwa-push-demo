@@ -1,0 +1,20 @@
+<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>預約通知測試</title><link rel="manifest" href="/manifest.json"><meta name="theme-color" content="#2f6f5e">
+<link rel="apple-touch-icon" href="/icon-192.png"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="預約通知">
+<style>body{font-family:sans-serif;max-width:480px;margin:40px auto;padding:0 16px}button{font-size:20px;padding:14px 24px;background:#2f6f5e;color:#fff;border:0;border-radius:10px;width:100%}#hint{background:#fff3cd;padding:12px;border-radius:8px;display:none}#status{margin-top:16px;font-size:18px}</style></head><body>
+<h1>預約通知測試</h1><div id="hint">iPhone 請先點 Safari 下方「分享」→「加入主畫面」，再從主畫面的圖示打開此頁，才能開啟通知（需 iOS 16.4 以上）。</div>
+<p>按下按鈕並允許通知，之後可以把手機鎖定，等待測試推播。</p><button id="btn">開啟通知</button><div id="status">尚未開啟</div>
+<script>
+const st=document.getElementById('status'),s=t=>st.textContent=t;
+const ios=/iphone|ipad|ipod/i.test(navigator.userAgent),standalone=navigator.standalone||matchMedia('(display-mode: standalone)').matches;
+if(ios&&!standalone)document.getElementById('hint').style.display='block';
+const b64=s=>{const p='='.repeat((4-s.length%4)%4),r=atob((s+p).replace(/-/g,'+').replace(/_/g,'/'));return Uint8Array.from([...r].map(c=>c.charCodeAt(0)))};
+let reg;if('serviceWorker'in navigator)navigator.serviceWorker.register('/sw.js').then(r=>{reg=r;return r.pushManager&&r.pushManager.getSubscription()}).then(x=>{if(x)s('✅ 已開啟通知（此裝置已訂閱）')});
+document.getElementById('btn').onclick=async()=>{try{
+if(!('serviceWorker'in navigator)||!('PushManager'in window)){s(ios&&!standalone?'請先加入主畫面再從圖示打開':'此瀏覽器不支援推播');return}
+const p=await Notification.requestPermission();if(p!=='granted'){s('通知權限被拒絕：'+p);return}
+reg=await navigator.serviceWorker.ready;const {publicKey}=await (await fetch('/vapid')).json();
+const sub=(await reg.pushManager.getSubscription())||await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64(publicKey)});
+const r=await fetch('/subscribe',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(sub)});
+s(r.ok?'✅ 已開啟通知！現在可以鎖定手機等待推播':'訂閱上傳失敗')}catch(e){s('錯誤：'+e.message)}};
+</script></body></html>
